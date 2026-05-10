@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Database files
+*.db
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+
+# Large media (optional depending on your project)
+images/*.png
+images/*.jpg

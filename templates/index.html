@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Traffic Monitor</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: linear-gradient(to right, #698fe7, #020617);
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(to right, #0ea5e9, #38bdf8);
+            color: white;
+            flex-shrink: 0;
+        }
+
+        #conn-status.live  { color: #22c55e; text-align:center; font-weight: bold; }
+        #conn-status.error { color: #ef4444; text-align:center; font-weight: bold; }
+
+        .latest-screen {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .latest {
+            width: 70%;
+            max-width: 650px;
+            background: rgba(30,41,59,0.95);
+            border-left: 6px solid #38bdf8;
+            padding: 20px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 0 25px rgba(56,189,248,0.25);
+        }
+
+        .latest img {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+        }
+
+        .history {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 20px;
+            justify-content: center;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 10px;
+            border-radius: 10px;
+            width: 160px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .card img {
+            width: 100%;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .latest.new {
+            animation: glow 1s ease-in-out;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 10px #38bdf8; }
+            50% { box-shadow: 0 0 30px #38bdf8; }
+            100% { box-shadow: 0 0 10px #38bdf8; }
+        }
+        
+        .violation-text { color: #ef4444; }
+        .ok-text { color: #22c55e; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🚦 Speed Limit Detection System Dashboard</h1>
+    <p>Real-time violation tracking</p>
+</div>
+
+<p id="conn-status">Connecting...</p>
+
+<div class="latest-screen">
+    <div class="latest" id="latest">
+        <p>Waiting for data telemetry...</p>
+    </div>
+</div>
+
+<h2 style="text-align:center;">📜 History</h2>
+
+<div class="history" id="history">
+    <!-- History cards will be injected here -->
+</div>
+
+<script>
+let lastId = null;
+
+async function update() {
+    const status = document.getElementById("conn-status");
+
+    try {
+        let res = await fetch("/api/latest");
+        let data = await res.json();
+
+        status.textContent = "● Live";
+        status.className = "live";
+
+        if (!data || data.length === 0) return;
+
+        // The API returns an array ordered by newest first. data[0] is the latest.
+        const latestRecord = data[0];
+
+        if (latestRecord.id !== lastId) {
+            lastId = latestRecord.id;
+
+            const latestDiv = document.getElementById("latest");
+            const isViolation = latestRecord.status === "VIOLATION";
+            const statusHtml = isViolation 
+                ? `<span class="violation-text">🚨 Overspeed (${latestRecord.speed} km/h)</span>` 
+                : `<span class="ok-text">✅ OK (${latestRecord.speed} km/h)</span>`;
+
+            // Update main screen
+            latestDiv.innerHTML =
+            `<img src="/images/${latestRecord.image}" alt="Vehicle Image">
+             <h2>${latestRecord.plate}</h2>
+             <p><b>Status:</b> ${statusHtml}</p>
+             <p><b>Limit:</b> ${latestRecord.speed_limit} km/h</p>
+             <p><b>Time:</b> ${latestRecord.timestamp}</p>
+             <p>📍 ${latestRecord.location}</p>`;
+
+            latestDiv.classList.add("new");
+            setTimeout(() => latestDiv.classList.remove("new"), 1000);
+
+            // Rebuild history based on the fetched array (skipping the first one)
+            const historyContainer = document.getElementById("history");
+            historyContainer.innerHTML = ""; // Clear existing
+            
+            for (let i = 1; i < data.length; i++) {
+                const log = data[i];
+                const card = document.createElement("div");
+                card.className = "card";
+                card.innerHTML =
+                    `<img src="/images/${log.image}" alt="Vehicle">
+                     <b>${log.plate}</b>
+                     <p style="margin: 5px 0; color: ${log.status === 'VIOLATION' ? '#ef4444' : '#22c55e'}">${log.speed} km/h</p>
+                     <p style="margin: 5px 0; font-size: 0.8em;">${log.timestamp}</p>
+                     <p style="margin: 5px 0; font-size: 0.8em;">📍 ${log.location}</p>`;
+                historyContainer.appendChild(card);
+            }
+        }
+
+    } catch (e) {
+        status.textContent = "● Disconnected";
+        status.className = "error";
+    }
+}
+
+// Start polling
+setInterval(update, 1000);
+update(); // Initial call
+</script>
+
+</body>
+</html>
